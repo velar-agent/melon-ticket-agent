@@ -232,7 +232,10 @@ func ensurePCID(client *http.Client) error {
 			return nil
 		}
 	}
-	pcid := newPCID(time.Now())
+	pcid, err := newPCID(time.Now())
+	if err != nil {
+		return err
+	}
 	jar.SetCookies(ticketURL, []*http.Cookie{{
 		Name:   "PCID",
 		Value:  pcid,
@@ -250,11 +253,14 @@ func ensurePCID(client *http.Client) error {
 }
 
 // English: HAR PCID is 23 digits (10-digit Unix seconds + 13 digits). Korean: HAR PCID는 23자리(Unix초 10자리 + 13자리)입니다.
-func newPCID(now time.Time) string {
+func newPCID(now time.Time) (string, error) {
 	sec := now.Unix()
 	ms := now.Nanosecond() / int(time.Millisecond)
-	randPart, _ := rand.Int(rand.Reader, big.NewInt(10000000000))
-	return fmt.Sprintf("%d%03d%010d", sec, ms, randPart.Int64())
+	randPart, err := rand.Int(rand.Reader, big.NewInt(10000000000))
+	if err != nil {
+		return "", fmt.Errorf("generate PCID: %w", err)
+	}
+	return fmt.Sprintf("%d%03d%010d", sec, ms, randPart.Int64()), nil
 }
 
 type kakaoLoginPage struct {
@@ -656,8 +662,9 @@ func melonLoginProcs(client *http.Client, oauthURL, pocID, redirectURL, accessTo
 		}
 	}
 	// English: set cookies may also live only in the jar; fall back to it. Korean: jar에만 있는 경우도 확인합니다.
+	// English: Also check the loginProcs URL itself so Path-less Set-Cookie values (default Path /login) are found. Korean: Path 없는 Set-Cookie도 찾기 위해 loginProcs URL 자체도 함께 읽습니다.
 	if client.Jar != nil {
-		for _, base := range []string{"https://accounts.melon.com/", "https://ticket.melon.com/"} {
+		for _, base := range []string{"https://accounts.melon.com/login/loginProcs", "https://accounts.melon.com/", "https://ticket.melon.com/"} {
 			u, _ := url.Parse(base)
 			for _, cookie := range client.Jar.Cookies(u) {
 				switch cookie.Name {

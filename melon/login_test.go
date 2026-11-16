@@ -193,6 +193,10 @@ func newLoginFixture(t *testing.T, overrides map[string]mockReply, redirectProcs
 		setCookie := func(name, value, domain string, secure bool) {
 			http.SetCookie(w, &http.Cookie{Name: name, Value: value, Domain: domain, Path: "/", Secure: secure, HttpOnly: true})
 		}
+		setCookieNoPath := func(name, value, domain string) {
+			// English: Path-less Set-Cookie defaults to /login in Go cookiejar; exercises the loginProcs URL fallback. Korean: Path 없는 쿠키는 기본 경로가 /login이므로 loginProcs URL 폴백을 검증합니다.
+			http.SetCookie(w, &http.Cookie{Name: name, Value: value, Domain: domain, Secure: false, HttpOnly: true})
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/v2/") {
 			if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" || r.Header.Get("Accept") != "*/*" || r.Header.Get("Accept-Language") != loginAcceptLanguage {
 				t.Error("Kakao API method or JSON/language headers differ from the HAR")
@@ -361,17 +365,22 @@ func newLoginFixture(t *testing.T, overrides map[string]mockReply, redirectProcs
 			if !reflect.DeepEqual(r.PostForm, want) {
 				t.Error("loginProcs fields differ from the HAR")
 			}
+			if redirectProcs {
+				// English: Use Path-less cookies here to cover the default-Path jar case. Korean: Path 없는 쿠키로 기본 경로 jar 케이스를 검증합니다.
+				setCookieNoPath("keyCookie", "test-key", "melon.com")
+				setCookieNoPath("MAC", "test-mac", "melon.com")
+				setCookieNoPath("MLCP", "test-mlcp", "melon.com")
+				setCookieNoPath("MUS", "test-mus", "melon.com")
+				http.Redirect(w, r, "https://ticket.melon.com/done", http.StatusFound)
+				return
+			}
 			setCookie("keyCookie", "test-key", "melon.com", false)
 			setCookie("MAC", "test-mac", "melon.com", false)
 			setCookie("MLCP", "test-mlcp", "melon.com", false)
 			setCookie("MUS", "test-mus", "melon.com", false)
-			if redirectProcs {
-				http.Redirect(w, r, "https://ticket.melon.com/done", http.StatusFound)
-				return
-			}
 			_, _ = io.WriteString(w, "ok")
 		case "ticket.melon.com/done":
-			assertCookie(r, "keyCookie", "test-key")
+			// English: Path-less loginProcs cookies default to /login, so they are not sent to /done; session extraction happens via the loginProcs jar lookup. Korean: Path 없는 쿠키는 /login 기본 경로라 /done에서는 전송되지 않습니다.
 			_, _ = io.WriteString(w, "done")
 		default:
 			t.Errorf("unexpected request: %s", step)
