@@ -17,14 +17,14 @@ func main() {
 		log.Fatalf("read .env: %v", err)
 	}
 
-	// English: Log in with .env account info and use the fresh session directly for Reservation(). Korean: .env 계정 정보로 먼저 로그인하고, Reservation()에 세션을 메모리로 바로 넘깁니다.
+	// English: Log in with .env account info by constructing Melon; the session stays inside the Melon object. Korean: .env 계정 정보로 Melon을 생성하며 로그인하고, 세션은 Melon 객체 내부에만 둡니다.
 	loginID := strings.TrimSpace(env["KAKAO_LOGIN_ID"])
 	loginPWD := strings.TrimSpace(env["KAKAO_LOGIN_PWD"])
-	// English: Fail before Reservation when credentials are absent instead of bouncing off a nil session inside Reservation. Korean: 자격 증명이 없으면 nil 세션을 Reservation으로 넘기지 않고 여기서 먼저 종료합니다.
+	// English: Fail early when credentials are absent. Korean: 자격 증명이 없으면 여기서 먼저 종료합니다.
 	if loginID == "" || loginPWD == "" {
 		log.Fatal("KAKAO_LOGIN_ID and KAKAO_LOGIN_PWD are required in .env")
 	}
-	session, err := melon.Login(loginID, loginPWD, readSMSCode)
+	m, err := melon.New(loginID, loginPWD, readSMSCode)
 	if err != nil {
 		log.Fatalf("login: %v", err)
 	}
@@ -50,7 +50,7 @@ func main() {
 		SeatID: env["SEAT_ID"],
 	}
 
-	reservations, err := melon.Reservation(perfInfo, seatInfo, session)
+	reservations, err := m.Reservation(perfInfo, seatInfo)
 	if len(reservations) > 0 {
 		fmt.Println(string(reservations))
 	}

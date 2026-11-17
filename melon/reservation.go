@@ -38,8 +38,8 @@ var (
 	reservationBaseURL = "https://ticket.melon.com/tktapi/reservation/prodlimit.json"
 )
 
-// English: Reservation requires the in-memory login session; the four login cookies no longer come from .env. Korean: 예약은 메모리 세션을 필요로 하며, 네 로그인 쿠키는 .env에서 읽지 않습니다.
-func Reservation(perfInfo PerfInfo, seatInfo SeatInfo, session *Session) (json.RawMessage, error) {
+// English: Reservation uses the Melon's in-memory login session; the four login cookies no longer come from .env. Korean: 예약은 Melon이 가진 메모리 세션을 사용하며, 네 로그인 쿠키는 .env에서 읽지 않습니다.
+func (m *Melon) Reservation(perfInfo PerfInfo, seatInfo SeatInfo) (json.RawMessage, error) {
 	if perfInfo.ProdID == "" || perfInfo.PerfDate == "" ||
 		perfInfo.ScheduleNo == "" {
 		return nil, fmt.Errorf("prodId, perfDate, and scheduleNo are required")
@@ -48,9 +48,11 @@ func Reservation(perfInfo PerfInfo, seatInfo SeatInfo, session *Session) (json.R
 	if seatId == "" {
 		return nil, fmt.Errorf("seatInfo.SeatID is required")
 	}
-	if session == nil {
-		return nil, fmt.Errorf("session is required")
+	// English: Guard nil/unconstructed Melon so callers get an error instead of a panic. Korean: nil이거나 New로 만들지 않은 Melon은 패닉 대신 에러를 반환합니다.
+	if m == nil || m.session == nil {
+		return nil, fmt.Errorf("melon is not logged in; create it with melon.New")
 	}
+	session := m.session
 	if strings.TrimSpace(session.PCID) == "" || strings.TrimSpace(session.KeyCookie) == "" ||
 		strings.TrimSpace(session.MAC) == "" || strings.TrimSpace(session.MLCP) == "" {
 		return nil, fmt.Errorf("session must contain PCID, keyCookie, MAC and MLCP")

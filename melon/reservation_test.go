@@ -71,7 +71,7 @@ func TestReservationSendsSessionCookies(t *testing.T) {
 	reservationBaseURL = srv.URL
 	defer func() { reservationBaseURL = oldBase }()
 
-	got, err := Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}, testSession())
+	got, err := (&Melon{session: testSession()}).Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"})
 	if err != nil {
 		t.Fatalf("Reservation returned error: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestReservationRequestCarriesPCIDWithoutHARHeaders(t *testing.T) {
 
 	session := testSession()
 	session.MLCP = "k"
-	if _, err := Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}, session); err != nil {
+	if _, err := (&Melon{session: session}).Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}); err != nil {
 		t.Fatalf("Reservation returned error: %v", err)
 	}
 	if captured == nil {
@@ -172,7 +172,7 @@ func TestReservationReportsCodeFieldOnLoginExpired(t *testing.T) {
 	session := testSession()
 	session.MAC = "m"
 	session.MLCP = "l"
-	raw, err := Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}, session)
+	raw, err := (&Melon{session: session}).Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"})
 	if err == nil {
 		t.Fatal("expected T9220 error, got success")
 	}
@@ -193,10 +193,13 @@ func TestReservationRequiresSession(t *testing.T) {
 		"CHKCAPT":  "x",
 		"CALLBACK": "cb",
 	})
-	if _, err := Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}, nil); err == nil || !strings.Contains(err.Error(), "session is required") {
-		t.Fatalf("nil session err = %v, want session is required", err)
+	if _, err := (*Melon)(nil).Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}); err == nil || !strings.Contains(err.Error(), "not logged in") {
+		t.Fatalf("nil Melon err = %v, want not logged in", err)
 	}
-	if _, err := Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}, &Session{PCID: "p"}); err == nil || !strings.Contains(err.Error(), "must contain") {
+	if _, err := (&Melon{}).Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}); err == nil || !strings.Contains(err.Error(), "not logged in") {
+		t.Fatalf("nil session err = %v, want not logged in", err)
+	}
+	if _, err := (&Melon{session: &Session{PCID: "p"}}).Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}); err == nil || !strings.Contains(err.Error(), "must contain") {
 		t.Fatalf("incomplete session err = %v, want must contain", err)
 	}
 }
@@ -223,7 +226,7 @@ func TestReservationAllowsEmptyChkCapt(t *testing.T) {
 	reservationBaseURL = srv.URL
 	defer func() { reservationBaseURL = oldBase }()
 
-	if _, err := Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}, testSession()); err != nil {
+	if _, err := (&Melon{session: testSession()}).Reservation(testPerfInfo(), SeatInfo{SeatID: "21_56"}); err != nil {
 		t.Fatalf("empty CHKCAPT should not fail: %v", err)
 	}
 	if got := capturedForm.Get("chkcapt"); got != "" {
